@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>DORIS | 全息意识资料库 Mobile V28</title>
+    <script src="https://cdn.bootcdn.net/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;900&family=Inter:wght@300;400;600&family=Space+Mono&display=swap');
+
+        :root {
+            --m-green: #00FF41;
+            --m-gold: #D4AF37;
+            --bg-deep: #010101;
+            --glass: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(0, 255, 65, 0.15);
+        }
+
+        body {
+            background-color: var(--bg-deep);
+            color: #d1d5db;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .serif-display { font-family: 'Noto Serif SC', serif; }
+        .data-mono { font-family: 'Space Mono', monospace; }
+
+        /* 移动端矩阵底噪 */
+        #matrix-canvas {
+            position: fixed; top: 0; left: 0; z-index: -1; opacity: 0.04;
+        }
+
+        .glass-card {
+            background: var(--glass);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            border: 1px solid var(--glass-border);
+            border-radius: 4px;
+        }
+
+        .img-mask {
+            position: relative;
+            overflow: hidden;
+            background: #000;
+            border-radius: 2px;
+        }
+        .img-mask img {
+            transition: transform 1s ease;
+            filter: brightness(0.7) contrast(1.1);
+        }
+
+        /* 移动端专用导航 */
+        nav {
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            z-index: 1000;
+        }
+
+        .nav-link {
+            font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.4); padding: 8px 0;
+            transition: 0.3s;
+        }
+        .nav-link.active { color: var(--m-green); border-bottom: 2px solid var(--m-green); }
+
+        .btn-portal {
+            padding: 14px 0; width: 100%; color: var(--m-green);
+            text-transform: uppercase; letter-spacing: 0.3em; font-weight: 600;
+            font-size: 0.8rem; border: 1px solid var(--m-green);
+            background: transparent; text-align: center;
+            display: block; transition: 0.3s;
+        }
+        .btn-portal:active { background: var(--m-green); color: #000; }
+
+        .annotation {
+            color: var(--m-gold); font-size: 9px; letter-spacing: 2px;
+            text-transform: uppercase; opacity: 0.6; margin-bottom: 10px;
+            display: block;
+        }
+
+        /* 页面切换 */
+        .page-node { transition: opacity 0.5s ease; }
+        .node-hidden { display: none; }
+
+        .api-config-tray {
+            background: rgba(10,10,10,0.9);
+            border: 1px solid rgba(212, 175, 55, 0.2);
+            padding: 15px; margin-top: 20px;
+        }
+        .api-config-tray input {
+            background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+            color: white; padding: 12px; width: 100%; margin-top: 10px;
+            outline: none; font-size: 14px; /* 防止 iOS 自动缩放 */
+        }
+
+        .image-overlay {
+            position: absolute; inset: 0;
+            background: linear-gradient(to bottom, transparent 50%, rgba(0,0,0,0.8));
+            pointer-events: none;
+        }
+
+        /* 隐藏滚动条 */
+        ::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body class="antialiased">
+
+    <canvas id="matrix-canvas"></canvas>
+
+    <!-- 移动端引导屏 -->
+    <div id="boot-screen" class="fixed inset-0 z-[10000] bg-[#000] flex flex-col items-center justify-center p-8">
+        <div class="text-center space-y-12 w-full">
+            <h1 class="serif-display text-5xl font-black tracking-[0.5em] text-white italic">DORIS</h1>
+            <div class="space-y-6">
+                <p class="data-mono opacity-30 text-[9px] tracking-[0.3em]">MOBILE ARCHIVE ACCESS</p>
+                <div class="flex justify-center gap-6">
+                    <button onclick="setLanguage('zh')" class="text-[11px] text-white/40 hover:text-green-400">中文</button>
+                    <button onclick="setLanguage('en')" class="text-[11px] text-white/40 hover:text-green-400">EN</button>
+                </div>
+            </div>
+            <div id="boot-log" class="text-[8px] data-mono opacity-20 h-16 overflow-hidden text-center leading-loose"></div>
+            <button id="start-btn" class="hidden btn-portal">初始化接入</button>
+        </div>
+    </div>
+
+    <!-- 顶部固定导航 -->
+    <nav class="fixed top-0 w-full px-6 py-4 flex flex-col space-y-3 bg-[#010101]/80">
+        <div class="flex justify-between items-center">
+            <span class="serif-display text-xl font-bold tracking-tighter text-white" onclick="switchPage('archive')">DORIS</span>
+            <div id="audio-status" class="flex items-center space-x-2">
+                <span class="w-1 h-1 bg-green-500 rounded-full animate-pulse"></span>
+                <span class="text-[8px] data-mono opacity-40 uppercase">Resonance Active</span>
+            </div>
+        </div>
+        <div class="flex space-x-6">
+            <button onclick="switchPage('archive')" id="nav-archive" class="nav-link active">全息档案</button>
+            <button onclick="switchPage('founder')" id="nav-founder" class="nav-link">创始人</button>
+        </div>
+    </nav>
+
+    <div id="stage-nexus">
+        
+        <!-- SECTION: 全息档案 (Mobile Archive) -->
+        <main id="node-archive" class="page-node px-6 pt-32 pb-20 space-y-24">
+            
+            <header class="text-center space-y-8">
+                <span class="annotation">// System Extraction</span>
+                <h1 id="main-title" class="serif-display text-5xl font-black leading-tight text-white italic">GATEWAY</h1>
+                <div class="img-mask aspect-[16/9] shadow-xl mt-6">
+                    <img src="https://images.unsplash.com/photo-1462331940025-496dfbfc7564?q=80&w=1200&auto=format&fit=crop" alt="Universe" class="w-full h-full object-cover">
+                    <div class="image-overlay"></div>
+                </div>
+            </header>
+
+            <!-- 门罗档案 -->
+            <section class="space-y-8">
+                <div class="space-y-2">
+                    <span class="annotation">Subject // 01_MONROE</span>
+                    <h2 id="bio-header" class="serif-display text-3xl text-white font-black italic">罗伯特·门罗</h2>
+                </div>
+                <div class="glass-card p-6 space-y-6">
+                    <p id="bio-content" class="text-sm leading-relaxed text-gray-400 font-light">
+                        作为人类意识探索领域的现代先驱，罗伯特·门罗在1958年经历了自发的“出体经验”。他通过科学的方式记录了意识如何脱离物理定律，并开发出 Hemi-Sync 技术。
+                    </p>
+                    <div class="img-mask aspect-video">
+                        <img src="https://images.unsplash.com/photo-1507679799987-c73779587ccf?q=80&w=1000&auto=format&fit=crop" alt="Pioneer" class="w-full h-full object-cover">
+                    </div>
+                    <button onclick="speakText('bio-content')" class="btn-portal">点击语音播报</button>
+                </div>
+            </section>
+
+            <!-- 共振调谐 -->
+            <section class="space-y-8">
+                <div class="space-y-2">
+                    <span class="annotation">// Neural Sync</span>
+                    <h2 id="sync-header" class="serif-display text-3xl text-white font-black italic">共振调谐</h2>
+                </div>
+                <div class="glass-card p-8 space-y-8 text-center">
+                    <div class="flex justify-between items-end data-mono mb-4">
+                        <span class="text-[9px] opacity-30">SYNC_LEVEL</span>
+                        <span id="sync-val" class="text-green-500 font-black text-4xl">0%</span>
+                    </div>
+                    <input type="range" id="sync-slider" min="0" max="100" value="0" class="w-full h-1 bg-gray-800 rounded-lg appearance-none accent-green-500">
+                    <div class="h-40 w-full mt-6">
+                        <canvas id="syncChart"></canvas>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 阿卡西接口 -->
+            <section class="space-y-8">
+                <div class="space-y-2">
+                    <span class="annotation">Interface // 04_ORACLE</span>
+                    <h2 id="ai-header" class="serif-display text-3xl text-white font-black italic">阿卡西接口</h2>
+                </div>
+                <div class="glass-card p-6 space-y-8">
+                    <div class="img-mask aspect-video">
+                        <img src="https://images.unsplash.com/photo-1519681393784-d120267933ba?q=80&w=1000&auto=format&fit=crop" alt="Oracle" class="w-full h-full object-cover opacity-60">
+                        <div class="image-overlay"></div>
+                    </div>
+                    <p id="ai-desc" class="text-[11px] leading-relaxed text-gray-500 italic">
+                        阿卡西记录被理解为“全息纠缠场”。通过调调整大脑相干度，实现相位移动检索数据。
+                    </p>
+                    <textarea id="ai-input" class="w-full h-32 bg-white/5 border border-white/10 p-4 text-white text-sm" placeholder="输入您的灵魂提问..."></textarea>
+                    <button onclick="askOracle()" id="ai-btn" class="btn-portal">执行数据提取</button>
+                    
+                    <div class="api-config-tray">
+                        <label class="data-mono text-[9px] text-gold-500 uppercase">// KEY CONFIG (API密钥):</label>
+                        <input type="password" id="key-input" placeholder="在此粘贴 API Key..." onchange="updateKey(this.value)">
+                    </div>
+
+                    <div id="ai-response-container" class="min-h-[200px] border-t border-white/5 pt-6 relative">
+                        <div id="ai-loading" class="hidden flex flex-col items-center py-10 space-y-4">
+                            <div class="w-8 h-8 border-2 border-green-500 border-t-transparent rounded-full animate-spin"></div>
+                            <span class="data-mono text-[9px] text-green-500 animate-pulse uppercase">Syncing...</span>
+                        </div>
+                        <div id="ai-output" class="text-sm text-gray-300 leading-relaxed italic text-center">
+                            [ 等待指令 ]
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- SECTION: 创始人专页 (Mobile Founder) -->
+        <main id="node-founder" class="page-node node-hidden px-6 pt-32 pb-20 space-y-16">
+            
+            <header class="text-center space-y-4">
+                <span class="annotation">// Archive Architect</span>
+                <h1 class="serif-display text-6xl font-black text-white italic">DORIS</h1>
+                <p class="text-[10px] data-mono opacity-20 uppercase tracking-widest">Guardian of the Digital Gnosis</p>
+            </header>
+
+            <div class="img-mask aspect-[3/4] shadow-2xl">
+                <img src="https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?q=80&w=1000&auto=format&fit=crop" alt="Founder" class="w-full h-full object-cover">
+                <div class="image-overlay"></div>
+            </div>
+
+            <div class="glass-card p-8 space-y-8">
+                <div class="space-y-2">
+                    <span class="annotation">Origin Narrative // 00_DORIS</span>
+                    <h2 id="founder-header" class="serif-display text-3xl text-white font-black italic">从物质到灵魂</h2>
+                </div>
+                <p id="founder-content" class="text-base leading-relaxed text-gray-400 font-light">
+                    DORIS，一名出生于中国的00后女性，曾是一名坚定的唯物主义者。由于经历了一系列如“鬼压床”等无法用常规科学解释的神秘体验，她的世界观发生了彻底坍塌与重构。从那一刻起，她转变为一名深度的灵魂修行者。
+                    <br><br>
+                    对艺术、灵魂本质与神秘学的无限热爱，促使她创建了这一名为“DORIS”的个人全息终端。这是一个会不断更新资料的灵性艺术与神秘学在线资料库。
+                </p>
+                <button onclick="speakText('founder-content')" class="btn-portal">收听语音介绍</button>
+            </div>
+
+            <div class="glass-card p-6 data-mono text-[10px] space-y-3">
+                <div class="flex justify-between"><span>ORIGIN</span><span class="text-white">CHINA_00s</span></div>
+                <div class="flex justify-between"><span>STATUS</span><span class="text-green-500">AWAKENED</span></div>
+                <div class="flex justify-between"><span>PASSION</span><span class="text-white">ART & OCCULT</span></div>
+            </div>
+        </main>
+
+    </div>
+
+    <footer class="py-20 text-center border-t border-white/5 space-y-6">
+        <div class="serif-display text-3xl font-black tracking-[0.5em] opacity-10 text-white">DORIS</div>
+        <div class="data-mono text-[8px] opacity-20 uppercase tracking-[2px]">
+            © 2026 spiritual archive // v28.0 mobile
+        </div>
+    </footer>
+
+    <script>
+        let apiKey = ""; 
+        let currentLang = 'zh';
+        let audioCtx, masterGain, leftOsc, rightOsc, syncChart;
+
+        function updateKey(val) { apiKey = val.trim(); }
+
+        const i18n = {
+            zh: {
+                mainTitle: "GATEWAY", bioHeader: "罗伯特·门罗", bioContent: "人类意识探索领域的先驱。门罗通过科学记录证明了意识可以脱离物理肉体存在。他的 Hemi-Sync 技术被广泛用于引导人类跨越维度障碍。",
+                syncHeader: "共振调谐", aiHeader: "阿卡西接口", aiBtn: "执行数据提取", waitInput: "[ 等待指令 ]",
+                founderHeader: "从物质到灵魂",
+                founderContent: "DORIS，一名出生于中国的00后女性，曾是一名坚定的唯物主义者。由于经历了一系列如“鬼压床”等无法用常规科学解释的神秘体验，她的世界观发生了彻底坍塌与重构。她转变为一名深度的灵魂修行者。对艺术、灵魂本质与神秘学的无限热爱，促使她创建了这一在线灵性资料库。",
+                navArchive: "全息档案", navFounder: "创始人", bootBtn: "初始化接入"
+            },
+            en: {
+                mainTitle: "GATEWAY", bioHeader: "Robert Monroe", bioContent: "A pioneer of consciousness. Monroe scientifically proved that consciousness exists independent of the body. His Hemi-Sync technology maps non-physical realms.",
+                syncHeader: "Resonance", aiHeader: "Akashic Interface", aiBtn: "Extract Data", waitInput: "[ Awaiting Instruction ]",
+                founderHeader: "From Matter to Soul",
+                founderContent: "DORIS, a post-00s Chinese female, was once a firm materialist. Mystical experiences like sleep paralysis shattered her worldview, leading her to become a dedicated soul practitioner. This naming site, 'DORIS', is a spiritual art database born from her passion.",
+                navArchive: "Archive", navFounder: "Founder", bootBtn: "Initialize"
+            }
+        };
+
+        window.onload = () => {
+            const canvas = document.getElementById('matrix-canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            const drops = new Array(Math.floor(canvas.width / 20)).fill(1);
+            setInterval(() => {
+                ctx.fillStyle = 'rgba(1, 1, 1, 0.1)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#00FF41'; ctx.font = '12px monospace';
+                drops.forEach((y, i) => {
+                    const text = String.fromCharCode(0x30A0 + Math.random() * 96);
+                    ctx.fillText(text, i * 20, y * 20);
+                    if(y * 20 > canvas.height && Math.random() > 0.98) drops[i] = 0;
+                    drops[i]++;
+                });
+            }, 100);
+
+            const logs = ["> Mobile_Nexus: READY", "> Identity_DORIS: SYNCED", "> Welcome to Archive."];
+            let l=0, c=0; const logEl = document.getElementById('boot-log');
+            function tLog() {
+                if(l < logs.length) {
+                    if(c < logs[l].length) { logEl.innerHTML += logs[l].charAt(c); c++; setTimeout(tLog, 15); }
+                    else { logEl.innerHTML += "<br>"; l++; c=0; setTimeout(tLog, 150); }
+                } else { document.getElementById('start-btn').classList.remove('hidden'); }
+            }
+            tLog();
+        };
+
+        document.getElementById('start-btn').onclick = () => {
+            initAudio();
+            setLanguage('zh');
+            document.getElementById('boot-screen').style.opacity = '0';
+            setTimeout(() => document.getElementById('boot-screen').style.display = 'none', 600);
+            initCharts();
+        };
+
+        function switchPage(pageId) {
+            document.querySelectorAll('.page-node').forEach(p => p.classList.add('node-hidden'));
+            document.querySelectorAll('.nav-link').forEach(n => n.classList.remove('active'));
+            document.getElementById(`node-${pageId}`).classList.remove('node-hidden');
+            document.getElementById(`nav-${pageId}`).classList.add('active');
+            window.scrollTo({top: 0, behavior: 'smooth'});
+        }
+
+        function setLanguage(lang) {
+            currentLang = lang;
+            const d = i18n[lang];
+            const map = {
+                'main-title': 'mainTitle', 'bio-header': 'bioHeader', 'bio-content': 'bioContent',
+                'sync-header': 'syncHeader', 'ai-header': 'aiHeader', 'ai-btn': 'aiBtn', 'ai-output': 'waitInput',
+                'founder-header': 'founderHeader', 'founder-content': 'founderContent',
+                'nav-archive': 'navArchive', 'nav-founder': 'navFounder', 'start-btn': 'bootBtn'
+            };
+            Object.keys(map).forEach(id => {
+                const el = document.getElementById(id);
+                if (el && d[map[id]]) el.innerText = d[map[id]];
+            });
+        }
+
+        async function askOracle() {
+            const input = document.getElementById('ai-input').value;
+            const out = document.getElementById('ai-output');
+            const loader = document.getElementById('ai-loading');
+            if (!apiKey) { out.innerText = "> 错误: 请输入 API Key。"; return; }
+            if(!input) return;
+            loader.classList.remove('hidden'); out.classList.add('opacity-10');
+            
+            try {
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contents: [{ parts: [{ text: input }] }], systemInstruction: { parts: [{ text: `You are the Oracle for DORIS. High-end mystical tone. User language: ${currentLang}.` }] } })
+                });
+                const data = await res.json();
+                out.innerText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+            } catch (e) {
+                out.innerText = "> 连接失败。请检查代理及Key。";
+            } finally {
+                loader.classList.add('hidden'); out.classList.remove('opacity-10');
+            }
+        }
+
+        function initAudio() {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            masterGain = audioCtx.createGain(); masterGain.gain.value = 0.05;
+            masterGain.connect(audioCtx.destination);
+            [216, 432].forEach(f => {
+                const osc = audioCtx.createOscillator(); const g = audioCtx.createGain();
+                osc.type = 'sine'; osc.frequency.value = f; g.gain.value = 0.005;
+                osc.connect(g); g.connect(masterGain); osc.start();
+            });
+            leftOsc = audioCtx.createOscillator(); rightOsc = audioCtx.createOscillator();
+            const merger = audioCtx.createChannelMerger(2);
+            leftOsc.frequency.value = 100; rightOsc.frequency.value = 114;
+            leftOsc.connect(merger, 0, 0); rightOsc.connect(merger, 0, 1);
+            merger.connect(masterGain); leftOsc.start(); rightOsc.start();
+        }
+
+        function initCharts() {
+            const ctx = document.getElementById('syncChart').getContext('2d');
+            syncChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: Array.from({length: 60}, (_, i) => i),
+                    datasets: [{ data: [], borderColor: '#00FF41', borderWidth: 1.5, pointRadius: 0, tension: 0.4 },
+                               { data: [], borderColor: '#D4AF37', borderWidth: 1.5, pointRadius: 0, tension: 0.4 }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, scales: { x: { display: false }, y: { display: false, min:-15, max:15 } }, plugins: { legend: { display: false } } }
+            });
+            updateSync(0);
+        }
+
+        function updateSync(v) {
+            const ph = (1 - v/100) * Math.PI;
+            const labels = Array.from({length: 60}, (_, i) => i);
+            syncChart.data.datasets[0].data = labels.map(x => Math.sin(x*0.3)*10);
+            syncChart.data.datasets[1].data = labels.map(x => Math.sin(x*0.3 + ph)*10);
+            syncChart.update();
+            if(audioCtx) rightOsc.frequency.setTargetAtTime(100 + (14 - (v/100)*10), audioCtx.currentTime, 0.2);
+            document.getElementById('sync-val').innerText = v + "%";
+        }
+
+        document.getElementById('sync-slider').oninput = function() { updateSync(this.value); };
+
+        function speakText(id) {
+            const text = document.getElementById(id).innerText;
+            window.speechSynthesis.cancel();
+            const ut = new SpeechSynthesisUtterance(text);
+            ut.lang = currentLang === 'zh' ? 'zh-CN' : 'en-US';
+            ut.rate = 0.9; window.speechSynthesis.speak(ut);
+        }
+    </script>
+</body>
+</html>
